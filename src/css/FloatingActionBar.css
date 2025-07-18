@@ -1,0 +1,72 @@
+/* src/components/reusablecomponent/FloatingActionBar.css */
+
+.fab-fixed-center {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+  }
+
+   /* Default button/icon size for desktop */
+   .fab-btn {
+    width: 54px;
+    height: 54px;
+    padding: 16px;
+    background: #14397C;
+    border-bottom: 1px solid #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    outline: none;
+    transition: background 0.2s;
+  }
+  .fab-btn:last-child {
+    border-bottom: none;
+    border-radius: 0 0 0 4px;
+  }
+  .fab-btn:first-child {
+    border-radius: 4px 0 0 0;
+  }
+  .fab-icon {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.2s;
+  }
+  .fab-icon:hover {
+    transform: scale(1.05);
+  }
+
+  /* On small screens, use a fixed top offset for stability */
+  @media (max-width: 480px) {
+    .fab-fixed-center {
+      top: 50%;
+      bottom: 50%;           /* Adjust as needed for visual centering */
+      transform: none;
+    }
+    .fab-btn {
+      width: 36px;
+      height: 36px;
+      padding: 8px;
+    }
+    .fab-icon {
+      width: 18px;
+      height: 18px;
+    }
+    .fab-btn {
+        width: 40px;
+        height: 40px;
+        padding: 10px;
+        background: #14397C;
+        border-bottom: 1px solid #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        outline: none;
+        transition: background 0.2s;
+      }
+  }

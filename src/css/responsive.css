@@ -1,0 +1,33 @@
+/* Responsive Design */
+@media (max-width: 768px) {
+  .order-summary {
+    padding: 1rem;
+  }
+
+  .order-summary h2,
+  .order-summary h3 {
+    font-size: 1rem;
+  }
+
+  .order-summary .thumbnail {
+    width: 4rem;
+    height: 4rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .order-summary {
+    padding: 2rem;
+  }
+
+  .order-summary h2,
+  .order-summary h3 {
+    font-size: 1.25rem;
+  }
+
+  .order-summary .thumbnail {
+    width: 5rem;
+    height: 5rem;
+  }
+}
+/* Responsive Desin for checkout page ------------*/ 
