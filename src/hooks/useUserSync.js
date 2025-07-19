@@ -1,90 +1,206 @@
 // src/hooks/useUserSync.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { UserService } from '@/services/userService';
-
-const userService = new UserService();
+import { useRouter } from 'next/navigation';
 
 export const useUserSync = () => {
-  const { user, isLoaded, isSignedIn } = useUser();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
   const [appwriteUser, setAppwriteUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const router = useRouter();
 
-  const syncUserToAppwrite = async (clerkUser) => {
+  // Define syncUserWithAppwrite using useCallback so it's memoized
+  const syncUserWithAppwrite = useCallback(async () => {
     try {
-      // Check if user already exists in Appwrite
-      let existingUser = await userService.getUserByClerkId(clerkUser.id);
-
-      if (existingUser) {
-        // Update existing user with latest Clerk data
-        const updatedData = {
-          email: clerkUser.emailAddresses[0]?.emailAddress || '',
-          first_name: clerkUser.firstName || '',
-          last_name: clerkUser.lastName || '',
-          full_name: `${clerkUser.firstName || ''} ${
-            clerkUser.lastName || ''
-          }`.trim(),
-          profile_image: clerkUser.imageUrl || '',
-          email_verified:
-            clerkUser.emailAddresses[0]?.verification?.status === 'verified',
-        };
-
-        existingUser = await userService.updateUser(
-          existingUser.$id,
-          updatedData
-        );
-        setAppwriteUser(existingUser);
-      } else {
-        // Create new user in Appwrite
-        const newUserData = {
-          clerk_id: clerkUser.id,
-          email: clerkUser.emailAddresses[0]?.emailAddress || '',
-          first_name: clerkUser.firstName || '',
-          last_name: clerkUser.lastName || '',
-          full_name: `${clerkUser.firstName || ''} ${
-            clerkUser.lastName || ''
-          }`.trim(),
-          profile_image: clerkUser.imageUrl || '',
-          phone: clerkUser.phoneNumbers[0]?.phoneNumber || '',
-          role: 'user',
-          email_verified:
-            clerkUser.emailAddresses[0]?.verification?.status === 'verified',
-        };
-
-        const newUser = await userService.createUser(newUserData);
-        setAppwriteUser(newUser);
-      }
-    } catch (err) {
-      console.error('Error syncing user to Appwrite:', err);
-      setError(err.message);
-    }
-  };
-
-  useEffect(() => {
-    const syncUser = async () => {
-      if (!isLoaded) return;
-
       setIsLoading(true);
       setError(null);
 
-      if (isSignedIn && user) {
-        await syncUserToAppwrite(user);
-      } else {
-        setAppwriteUser(null);
+      if (!clerkUser?.id) {
+        console.warn('No clerk user ID available for sync');
+        setIsLoading(false);
+        return;
       }
 
-      setIsLoading(false);
-    };
+      // Try to sync via the server API endpoint first (which has proper permissions)
+      try {
+        // Try multiple approaches to sync the user
+        let syncSuccessful = false;
+        let userResult = null;
 
-    syncUser();
-  }, [isLoaded, isSignedIn, user]);
+        // Try our standard sync API
+        try {
+          const response = await fetch('/api/sync-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userData: {
+                clerkId: clerkUser.id,
+                email: clerkUser.emailAddresses?.[0]?.emailAddress || '',
+                firstName: clerkUser.firstName || '',
+                lastName: clerkUser.lastName || '',
+                profileImageUrl: clerkUser.imageUrl || null,
+                phoneNumber: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
+                role: 'customer', // Default role
+                is_Admin: false, // Default to non-admin
+              },
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            console.log('User synced via standard API:', result.action);
+            syncSuccessful = true;
+            existingUser = result.user;
+          } else {
+            console.error(
+              'Failed to sync user via standard API:',
+              result.error
+            );
+            throw new Error(result.error || 'Failed to sync user');
+          }
+        } catch (standardApiError) {
+          console.warn('Standard sync API failed:', standardApiError.message);
+          // If standard API failed, trigger the client fallback
+          throw new Error('Standard API sync failed');
+        }
+      } catch (apiError) {
+        console.warn(
+          'API sync failed, falling back to client method:',
+          apiError.message
+        );
+
+        try {
+          // Fallback to direct client method
+          let existingUser = await UserService.getUserByClerkId(clerkUser.id);
+
+          if (!existingUser) {
+            // Create new user in Appwrite
+            const userData = {
+              clerkId: clerkUser.id,
+              email: clerkUser.emailAddresses?.[0]?.emailAddress || '',
+              firstName: clerkUser.firstName || '',
+              lastName: clerkUser.lastName || '',
+              profileImageUrl: clerkUser.imageUrl || null,
+              phoneNumber: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
+              role: 'customer', // Default role
+              is_Admin: false, // Default to non-admin
+            };
+
+            existingUser = await UserService.createUser(userData);
+          }
+
+          // If we successfully got or created a user via client method
+          if (existingUser) {
+            console.log('User synced via client-side fallback');
+            return existingUser;
+          }
+        } catch (clientError) {
+          console.error('Client fallback also failed:', clientError.message);
+          throw new Error('Failed to sync user data');
+        }
+      }
+
+      // If we got an existingUser from either the API or fallback method
+      if (existingUser) {
+        try {
+          // Update existing user with latest Clerk data
+          const updateData = {
+            email:
+              clerkUser.emailAddresses?.[0]?.emailAddress || existingUser.email,
+            first_name: clerkUser.firstName || existingUser.first_name,
+            last_name: clerkUser.lastName || existingUser.last_name,
+            profile_image: clerkUser.imageUrl || existingUser.profile_image,
+            phone_number:
+              clerkUser.phoneNumbers?.[0]?.phoneNumber ||
+              existingUser.phone_number,
+          };
+
+          // Only update if there are changes
+          const hasChanges = Object.keys(updateData).some(
+            (key) => updateData[key] !== existingUser[key]
+          );
+
+          if (hasChanges) {
+            existingUser = await UserService.updateUser(
+              existingUser.$id,
+              updateData
+            );
+          }
+        } catch (updateError) {
+          console.warn('Failed to update user data:', updateError.message);
+          // Continue with existing user data, don't block the sync
+        }
+      }
+
+      if (existingUser) {
+        // Set admin status based on the is_Admin field in Appwrite
+        const isUserAdmin = existingUser.is_Admin === true;
+        setIsAdmin(isUserAdmin);
+        setAppwriteUser(existingUser);
+      } else {
+        console.warn('No user data could be retrieved or created');
+        setAppwriteUser(null);
+        setIsAdmin(false);
+      }
+
+      // We'll handle redirects in the component that uses this hook
+      // This prevents unwanted redirects during normal user operations
+    } catch (err) {
+      console.error('Error syncing user with Appwrite:', err);
+      setError(err.message || 'Failed to sync user data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clerkUser]);
+
+  useEffect(() => {
+    if (isClerkLoaded && clerkUser) {
+      syncUserWithAppwrite();
+    } else if (isClerkLoaded && !clerkUser) {
+      setAppwriteUser(null);
+      setIsAdmin(false);
+      setIsLoading(false);
+    }
+  }, [clerkUser, isClerkLoaded, syncUserWithAppwrite]);
+
+  const updateAppwriteUser = async (updateData) => {
+    try {
+      setError(null);
+      if (!appwriteUser) return null;
+
+      const updatedUser = await UserService.updateUser(
+        appwriteUser.$id,
+        updateData
+      );
+      setAppwriteUser(updatedUser);
+      setIsAdmin(updatedUser.is_Admin === true);
+      return updatedUser;
+    } catch (err) {
+      console.error('Error updating Appwrite user:', err);
+      setError(err.message || 'Failed to update user');
+      throw err;
+    }
+  };
+
+  const refreshAppwriteUser = async () => {
+    if (clerkUser) {
+      await syncUserWithAppwrite();
+    }
+  };
 
   return {
+    clerkUser,
     appwriteUser,
-    clerkUser: user,
+    isAdmin,
     isLoading,
     error,
-    syncUserToAppwrite,
+    updateAppwriteUser,
+    refreshAppwriteUser,
   };
 };

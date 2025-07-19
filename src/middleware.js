@@ -1,6 +1,12 @@
+// src/middleware.js
 import { clerkMiddleware } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 
-export default clerkMiddleware();
+// This function is the middleware's main entry point
+export default function middleware(request) {
+  // Run the Clerk middleware
+  return clerkMiddleware()(request);
+}
 
 export const config = {
   matcher: [

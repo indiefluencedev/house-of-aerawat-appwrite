@@ -4,17 +4,26 @@ import { useUser } from '@clerk/nextjs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useUserSync } from '@/hooks/useUserSync';
+import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
   const { user, isLoaded, isSignedIn } = useUser();
+  const { appwriteUser, isAdmin, isLoading: isUserSyncLoading } = useUserSync();
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    // When Clerk has loaded, update our loading state
-    if (isLoaded) {
+    // When Clerk has loaded and user sync is complete, update loading state
+    if (isLoaded && !isUserSyncLoading) {
       setLoading(false);
+
+      // If user is admin, redirect to admin dashboard
+      if (isSignedIn && isAdmin) {
+        router.push('/admin-dashboard');
+      }
     }
-  }, [isLoaded]);
+  }, [isLoaded, isUserSyncLoading, isSignedIn, isAdmin, router]);
 
   // Show loading state
   if (loading) {

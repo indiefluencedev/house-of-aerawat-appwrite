@@ -1,16 +1,31 @@
-// src/app/api/webhooks/clerk/route.js
+// src/app/api/webhook/clerk/route.js
 import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { UserService } from '@/services/userService';
+import {
+  serverDatabases,
+  DATABASE_ID,
+  USERS_COLLECTION_ID,
+} from '@/lib/appwrite-server';
+import { ID, Query } from 'node-appwrite';
 
-const userService = new UserService();
+// Force Node.js runtime for this API route to support Appwrite SDK fully
+export const runtime = 'nodejs';
 
 export async function POST(req) {
+  console.log('📣 Clerk webhook received');
+
   // Get the headers
   const headerPayload = headers();
   const svix_id = headerPayload.get('svix-id');
   const svix_timestamp = headerPayload.get('svix-timestamp');
   const svix_signature = headerPayload.get('svix-signature');
+
+  console.log('📣 Headers:', {
+    svix_id,
+    svix_timestamp,
+    svix_signature: svix_signature ? 'present' : 'missing',
+  });
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
@@ -25,6 +40,10 @@ export async function POST(req) {
 
   // Create a new Svix instance with your secret
   const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
+  console.log(
+    '📣 Webhook secret available:',
+    !!process.env.CLERK_WEBHOOK_SECRET
+  );
 
   let evt;
 
@@ -35,6 +54,7 @@ export async function POST(req) {
       'svix-timestamp': svix_timestamp,
       'svix-signature': svix_signature,
     });
+    console.log('📣 Webhook payload verified successfully');
   } catch (err) {
     console.error('Error verifying webhook:', err);
     return new Response('Error occurred', {
@@ -46,7 +66,8 @@ export async function POST(req) {
   const { id } = evt.data;
   const eventType = evt.type;
 
-  console.log(`Webhook with an ID of ${id} and type of ${eventType}`);
+  console.log(`📣 Webhook with an ID of ${id} and type of ${eventType}`);
+  console.log(`📣 Event data:`, JSON.stringify(evt.data));
 
   try {
     switch (eventType) {
@@ -74,49 +95,110 @@ export async function POST(req) {
 
 async function handleUserCreated(data) {
   try {
-    const userData = {
-      clerk_id: data.id,
-      email: data.email_addresses[0]?.email_address || '',
-      first_name: data.first_name || '',
-      last_name: data.last_name || '',
-      full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-      profile_image: data.image_url || '',
-      phone: data.phone_numbers[0]?.phone_number || '',
-      role: 'user',
-      email_verified:
-        data.email_addresses[0]?.verification?.status === 'verified',
-    };
+    console.log('📣 Processing user.created webhook for:', data.id);
 
-    const newUser = await userService.createUser(userData);
-    console.log('User created in Appwrite:', newUser);
+    // First check if user already exists (to handle potential duplicates)
+    const existingUsers = await serverDatabases.listDocuments(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      [Query.equal('clerk_id', data.id)]
+    );
+
+    console.log(
+      `📣 Found ${existingUsers.documents.length} existing users with clerkId ${data.id}`
+    );
+
+    if (existingUsers.documents.length > 0) {
+      console.log(
+        '📣 User already exists in Appwrite, skipping creation:',
+        data.id
+      );
+      return;
+    }
+
+    console.log('📣 Creating new user in Appwrite:', {
+      clerkId: data.id,
+      email: data.email_addresses?.[0]?.email_address || '[no email]',
+      firstName: data.first_name || '',
+      lastName: data.last_name || '',
+    });
+
+    // Create new user document
+    const newUser = await serverDatabases.createDocument(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      ID.unique(),
+      {
+        clerk_id: data.id,
+        email: data.email_addresses[0]?.email_address || '',
+        first_name: data.first_name || '',
+        last_name: data.last_name || '',
+        profile_image: data.image_url || '',
+        phone_number: data.phone_numbers[0]?.phone_number || '',
+        role: 'customer',
+        is_Admin: false, // Default to non-admin
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        preferences: {
+          newsletter: false,
+          smsUpdates: false,
+          emailUpdates: true,
+        },
+        addresses: [],
+        wishlist: [],
+        cart: [],
+        email_verified:
+          data.email_addresses?.[0]?.verification?.status === 'verified' ||
+          false,
+      }
+    );
+
+    console.log('📣 User created in Appwrite:', newUser.$id);
+    return newUser;
   } catch (error) {
-    console.error('Error creating user in Appwrite:', error);
+    console.error('📣 Error creating user in Appwrite:', error);
     throw error;
   }
 }
 
 async function handleUserUpdated(data) {
   try {
-    const existingUser = await userService.getUserByClerkId(data.id);
+    // Find the user by Clerk ID
+    const existingUsers = await serverDatabases.listDocuments(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      [Query.equal('clerk_id', data.id)]
+    );
 
-    if (existingUser) {
-      const updatedData = {
-        email: data.email_addresses[0]?.email_address || '',
-        first_name: data.first_name || '',
-        last_name: data.last_name || '',
-        full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-        profile_image: data.image_url || '',
-        phone: data.phone_numbers[0]?.phone_number || '',
-        email_verified:
-          data.email_addresses[0]?.verification?.status === 'verified',
-      };
-
-      const updatedUser = await userService.updateUser(
-        existingUser.$id,
-        updatedData
-      );
-      console.log('User updated in Appwrite:', updatedUser);
+    if (existingUsers.documents.length === 0) {
+      console.log('User not found in Appwrite, creating instead:', data.id);
+      return await handleUserCreated(data);
     }
+
+    const existingUser = existingUsers.documents[0];
+
+    // Update the user document
+    const updatedUser = await serverDatabases.updateDocument(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      existingUser.$id,
+      {
+        email: data.email_addresses[0]?.email_address || existingUser.email,
+        first_name: data.first_name || existingUser.first_name,
+        last_name: data.last_name || existingUser.last_name,
+        profile_image: data.image_url || existingUser.profile_image,
+        phone_number:
+          data.phone_numbers?.[0]?.phone_number || existingUser.phone_number,
+        email_verified:
+          data.email_addresses?.[0]?.verification?.status === 'verified' ||
+          existingUser.email_verified ||
+          false,
+        updated_at: new Date().toISOString(),
+      }
+    );
+
+    console.log('User updated in Appwrite:', updatedUser.$id);
   } catch (error) {
     console.error('Error updating user in Appwrite:', error);
     throw error;
@@ -125,14 +207,34 @@ async function handleUserUpdated(data) {
 
 async function handleUserDeleted(data) {
   try {
-    const existingUser = await userService.getUserByClerkId(data.id);
+    // Find the user by Clerk ID
+    const existingUsers = await serverDatabases.listDocuments(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      [Query.equal('clerk_id', data.id)]
+    );
 
-    if (existingUser) {
-      await userService.deleteUser(existingUser.$id);
-      console.log('User deleted from Appwrite:', data.id);
+    if (existingUsers.documents.length === 0) {
+      console.log('User not found in Appwrite, nothing to delete:', data.id);
+      return;
     }
+
+    const existingUser = existingUsers.documents[0];
+
+    // Mark the user as inactive instead of deleting
+    const updatedUser = await serverDatabases.updateDocument(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      existingUser.$id,
+      {
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      }
+    );
+
+    console.log('User marked as inactive in Appwrite:', updatedUser.$id);
   } catch (error) {
-    console.error('Error deleting user from Appwrite:', error);
+    console.error('Error handling user deletion in Appwrite:', error);
     throw error;
   }
 }

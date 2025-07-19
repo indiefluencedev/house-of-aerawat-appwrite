@@ -1,9 +1,30 @@
 // src/app/sso-callback/page.jsx
 
 'use client';
-import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
+import { AuthenticateWithRedirectCallback, useUser } from '@clerk/nextjs';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUserSync } from '@/hooks/useUserSync';
 
 export default function SSOCallback() {
+  const { isSignedIn, isLoaded } = useUser();
+  const { appwriteUser, isAdmin, isLoading: isUserSyncLoading } = useUserSync();
+  const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
+
+  // Handle redirection after authentication
+  useEffect(() => {
+    if (isSignedIn && !isUserSyncLoading && !redirecting) {
+      setRedirecting(true);
+      // Redirect to admin dashboard if user is an admin
+      if (isAdmin) {
+        router.push('/admin-dashboard');
+      } else {
+        router.push('/my-account');
+      }
+    }
+  }, [isSignedIn, isUserSyncLoading, isAdmin, router, redirecting]);
+
   return (
     <div className='flex min-h-[80vh] items-center justify-center bg-white'>
       <div className='text-center'>

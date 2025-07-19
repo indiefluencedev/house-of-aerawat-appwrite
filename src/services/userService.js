@@ -1,101 +1,207 @@
 // src/services/userService.js
-import { databases, DATABASE_ID, USERS_COLLECTION_ID } from '@/lib/appwrite';
-import { ID } from 'appwrite';
+import {
+  databases,
+  DATABASE_ID,
+  USERS_COLLECTION_ID,
+} from '@/lib/appwrite-client';
+import {
+  serverDatabases,
+  DATABASE_ID as SERVER_DATABASE_ID,
+  USERS_COLLECTION_ID as SERVER_USERS_COLLECTION_ID,
+} from '@/lib/appwrite-server';
+import { ID, Query } from 'node-appwrite';
 
 export class UserService {
-  // Create a new user in Appwrite
-  async createUser(userData) {
+  // Create user in Appwrite database
+  static async createUser(userData) {
     try {
       const user = await databases.createDocument(
         DATABASE_ID,
         USERS_COLLECTION_ID,
         ID.unique(),
         {
-          clerk_id: userData.clerk_id,
+          clerk_id: userData.clerkId,
           email: userData.email,
-          first_name: userData.first_name || '',
-          last_name: userData.last_name || '',
-          full_name: userData.full_name || '',
-          profile_image: userData.profile_image || '',
-          phone: userData.phone || '',
-          role: userData.role || 'user',
-          email_verified: userData.email_verified || false,
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          profile_image: userData.profileImageUrl || null,
+          phone_number: userData.phoneNumber || null,
+          role: userData.role || 'customer',
+          is_Admin: userData.is_Admin || false,
+          is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          // Add any other fields you need
+          preferences: {
+            newsletter: false,
+            smsUpdates: false,
+            emailUpdates: true,
+          },
+          addresses: [],
+          wishlist: [],
+          cart: [],
         }
       );
       return user;
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error('Error creating user in Appwrite:', error);
       throw error;
     }
   }
 
   // Get user by Clerk ID
-  async getUserByClerkId(clerkId) {
+  static async getUserByClerkId(clerkId) {
     try {
-      const response = await databases.listDocuments(
+      const users = await databases.listDocuments(
         DATABASE_ID,
         USERS_COLLECTION_ID,
-        [
-          {
-            attribute: 'clerk_id',
-            operator: 'equal',
-            value: clerkId,
-          },
-        ]
+        [Query.equal('clerk_id', clerkId)]
       );
-
-      return response.documents.length > 0 ? response.documents[0] : null;
+      return users.documents.length > 0 ? users.documents[0] : null;
     } catch (error) {
-      console.error('Error fetching user by Clerk ID:', error);
+      console.error('Error getting user by Clerk ID:', error);
       throw error;
     }
   }
 
-  // Update user information
-  async updateUser(documentId, userData) {
+  // Update user in Appwrite database
+  static async updateUser(userId, updateData) {
     try {
-      const updatedUser = await databases.updateDocument(
+      const user = await databases.updateDocument(
         DATABASE_ID,
         USERS_COLLECTION_ID,
-        documentId,
+        userId,
         {
-          ...userData,
+          ...updateData,
           updated_at: new Date().toISOString(),
         }
       );
-      return updatedUser;
+      return user;
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error('Error updating user in Appwrite:', error);
       throw error;
     }
   }
 
-  // Delete user
-  async deleteUser(documentId) {
+  // Delete user from Appwrite database
+  static async deleteUser(userId) {
     try {
-      await databases.deleteDocument(
+      await databases.deleteDocument(DATABASE_ID, USERS_COLLECTION_ID, userId);
+      return true;
+    } catch (error) {
+      console.error('Error deleting user from Appwrite:', error);
+      throw error;
+    }
+  }
+
+  // Get all users with pagination
+  static async getAllUsers(limit = 20, offset = 0) {
+    try {
+      const users = await databases.listDocuments(
         DATABASE_ID,
         USERS_COLLECTION_ID,
-        documentId
+        [Query.limit(limit), Query.offset(offset), Query.orderDesc('createdAt')]
       );
+      return users.documents;
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error('Error getting all users:', error);
       throw error;
     }
   }
 
-  // Get all users (admin only)
-  async getAllUsers() {
+  // Set or unset admin status for a user
+  static async setAdminStatus(userId, isAdmin) {
     try {
-      const response = await databases.listDocuments(
+      const user = await databases.updateDocument(
         DATABASE_ID,
-        USERS_COLLECTION_ID
+        USERS_COLLECTION_ID,
+        userId,
+        {
+          is_Admin: isAdmin,
+          updated_at: new Date().toISOString(),
+        }
       );
-      return response.documents;
+      return user;
     } catch (error) {
-      console.error('Error fetching all users:', error);
+      console.error('Error updating admin status:', error);
+      throw error;
+    }
+  }
+
+  // Server-side functions (for API routes)
+  static async createUserServer(userData) {
+    try {
+      const user = await serverDatabases.createDocument(
+        SERVER_DATABASE_ID,
+        SERVER_USERS_COLLECTION_ID,
+        ID.unique(),
+        {
+          clerk_id: userData.clerkId,
+          email: userData.email,
+          first_name: userData.firstName || '',
+          last_name: userData.lastName || '',
+          profile_image: userData.profileImageUrl || null,
+          phone_number: userData.phoneNumber || null,
+          role: userData.role || 'customer',
+          is_Admin: userData.is_Admin || false,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          preferences: {
+            newsletter: false,
+            smsUpdates: false,
+            emailUpdates: true,
+          },
+          addresses: [],
+          wishlist: [],
+          cart: [],
+        }
+      );
+      return user;
+    } catch (error) {
+      console.error('Error creating user in Appwrite (server):', error);
+      throw error;
+    }
+  }
+
+  static async getUserByClerkIdServer(clerkId) {
+    try {
+      // Try server databases first
+      try {
+        const users = await serverDatabases.listDocuments(
+          SERVER_DATABASE_ID,
+          SERVER_USERS_COLLECTION_ID,
+          [Query.equal('clerk_id', clerkId)]
+        );
+        return users.documents.length > 0 ? users.documents[0] : null;
+      } catch (serverError) {
+        // If server request fails (e.g. in Edge Runtime), fall back to client-side databases
+        console.warn(
+          'Server database access failed, falling back to client database:',
+          serverError.message
+        );
+        return await this.getUserByClerkId(clerkId);
+      }
+    } catch (error) {
+      console.error('Error getting user by Clerk ID (server):', error);
+      throw error;
+    }
+  }
+
+  static async updateUserServer(userId, updateData) {
+    try {
+      const user = await serverDatabases.updateDocument(
+        SERVER_DATABASE_ID,
+        SERVER_USERS_COLLECTION_ID,
+        userId,
+        {
+          ...updateData,
+          updated_at: new Date().toISOString(),
+        }
+      );
+      return user;
+    } catch (error) {
+      console.error('Error updating user in Appwrite (server):', error);
       throw error;
     }
   }

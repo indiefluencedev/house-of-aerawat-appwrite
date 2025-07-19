@@ -1,17 +1,17 @@
-// src/components/navbar.jsx
+// src/components/navigation/navbar.jsx
 'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useUserSync } from '@/hooks/useUserSync';
 
 const Navbar = () => {
-  const { isSignedIn, user: clerkUser } = useUser();
-  const { appwriteUser, isLoading } = useUserSync();
+  const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
+  const { appwriteUser, isLoading: isAppwriteLoading } = useUserSync();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -47,12 +47,12 @@ const Navbar = () => {
   };
 
   const getUserDashboardLink = () => {
-    if (!isSignedIn) return '/login';
-    return appwriteUser?.role === 'admin' ? '/admin' : '/dashboard';
+    if (!clerkUser || !appwriteUser) return '/login';
+    return appwriteUser.role === 'admin' ? '/admin' : '/my-account';
   };
 
   const renderUserIcon = () => {
-    if (isSignedIn && clerkUser) {
+    if (clerkUser) {
       return (
         <div
           className='relative'
@@ -61,43 +61,31 @@ const Navbar = () => {
         >
           <div className='flex items-center space-x-2 focus:outline-none cursor-pointer p-2'>
             <Link href={getUserDashboardLink()}>
-              {clerkUser.imageUrl ? (
-                <Image
-                  src={clerkUser.imageUrl}
-                  alt='User Profile'
-                  width={24}
-                  height={24}
-                  className='w-6 h-6 rounded-full'
-                />
-              ) : (
-                <Image
-                  src='/assets/svgs/user.svg'
-                  alt='User Profile'
-                  width={24}
-                  height={24}
-                  className='w-6 h-6'
-                />
-              )}
+              <Image
+                src={clerkUser.imageUrl || '/assets/svgs/user.svg'}
+                alt='User Profile'
+                width={24}
+                height={24}
+                className='w-6 h-6 rounded-full'
+              />
             </Link>
           </div>
 
           {showUserMenu && (
-            <div className='absolute right-0 mt-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-48'>
+            <div className='absolute right-0 mt-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[250px]'>
               <div className='pt-2'>
                 <div className='px-4 py-2 text-[16px] text-[#222222] font-medium border-b'>
                   <div className='font-semibold text-[16px] px-0'>
-                    {clerkUser.fullName ||
-                      `${clerkUser.firstName || ''} ${
-                        clerkUser.lastName || ''
-                      }`.trim() ||
-                      'User'}
+                    {clerkUser.firstName && clerkUser.lastName
+                      ? `${clerkUser.firstName} ${clerkUser.lastName}`
+                      : clerkUser.fullName || 'User'}
                   </div>
                   <div className='text-[14px] text-gray-500 tracking-wide'>
-                    {clerkUser.emailAddresses[0]?.emailAddress || 'No email'}
+                    {clerkUser.emailAddresses[0]?.emailAddress}
                   </div>
-                  {isLoading && (
+                  {isAppwriteLoading && (
                     <div className='text-[12px] text-blue-500 mt-1'>
-                      Syncing...
+                      Syncing profile...
                     </div>
                   )}
                 </div>
@@ -122,6 +110,12 @@ const Navbar = () => {
                       className='block px-4 py-3 text-[15px] text-[#222222] font-medium hover:bg-gray-100'
                     >
                       My Addresses
+                    </Link>
+                    <Link
+                      href='/my-account/wishlist'
+                      className='block px-4 py-3 text-[15px] text-[#222222] font-medium hover:bg-gray-100'
+                    >
+                      My Wishlist
                     </Link>
                   </>
                 )}
