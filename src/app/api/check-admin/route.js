@@ -25,7 +25,7 @@ export async function GET(request) {
     try {
       const user = await UserService.getUserByClerkIdServer(userId);
       if (user) {
-        const isAdmin = user.is_Admin === true;
+        const isAdmin = user.role === 'admin';
         return NextResponse.json({
           success: true,
           isAdmin,
@@ -35,7 +35,6 @@ export async function GET(request) {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            is_Admin: user.is_Admin,
             role: user.role,
           },
         });
@@ -60,7 +59,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const isAdmin = user.is_Admin === true;
+    const isAdmin = user.role === 'admin';
 
     return NextResponse.json({
       success: true,
@@ -71,7 +70,6 @@ export async function GET(request) {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        is_Admin: user.is_Admin,
         role: user.role,
       },
     });

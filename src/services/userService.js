@@ -27,19 +27,10 @@ export class UserService {
           profile_image: userData.profileImageUrl || null,
           phone_number: userData.phoneNumber || null,
           role: userData.role || 'customer',
-          is_Admin: userData.is_Admin || false,
-          is_active: true,
+          is_active: Boolean(true),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           // Add any other fields you need
-          preferences: {
-            newsletter: false,
-            smsUpdates: false,
-            emailUpdates: true,
-          },
-          addresses: [],
-          wishlist: [],
-          cart: [],
         }
       );
       return user;
@@ -110,20 +101,20 @@ export class UserService {
   }
 
   // Set or unset admin status for a user
-  static async setAdminStatus(userId, isAdmin) {
+  static async setUserRole(userId, role) {
     try {
       const user = await databases.updateDocument(
         DATABASE_ID,
         USERS_COLLECTION_ID,
         userId,
         {
-          is_Admin: isAdmin,
+          role: role,
           updated_at: new Date().toISOString(),
         }
       );
       return user;
     } catch (error) {
-      console.error('Error updating admin status:', error);
+      console.error('Error updating user role:', error);
       throw error;
     }
   }
@@ -143,18 +134,9 @@ export class UserService {
           profile_image: userData.profileImageUrl || null,
           phone_number: userData.phoneNumber || null,
           role: userData.role || 'customer',
-          is_Admin: userData.is_Admin || false,
-          is_active: true,
+          is_active: Boolean(true),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          preferences: {
-            newsletter: false,
-            smsUpdates: false,
-            emailUpdates: true,
-          },
-          addresses: [],
-          wishlist: [],
-          cart: [],
         }
       );
       return user;

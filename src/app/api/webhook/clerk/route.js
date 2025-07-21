@@ -136,21 +136,13 @@ async function handleUserCreated(data) {
         profile_image: data.image_url || '',
         phone_number: data.phone_numbers[0]?.phone_number || '',
         role: 'customer',
-        is_Admin: false, // Default to non-admin
-        is_active: true,
+        is_active: Boolean(true),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        preferences: {
-          newsletter: false,
-          smsUpdates: false,
-          emailUpdates: true,
-        },
-        addresses: [],
-        wishlist: [],
-        cart: [],
         email_verified:
-          data.email_addresses?.[0]?.verification?.status === 'verified' ||
-          false,
+          Boolean(
+            data.email_addresses?.[0]?.verification?.status === 'verified'
+          ) || Boolean(false),
       }
     );
 
@@ -191,9 +183,11 @@ async function handleUserUpdated(data) {
         phone_number:
           data.phone_numbers?.[0]?.phone_number || existingUser.phone_number,
         email_verified:
-          data.email_addresses?.[0]?.verification?.status === 'verified' ||
-          existingUser.email_verified ||
-          false,
+          Boolean(
+            data.email_addresses?.[0]?.verification?.status === 'verified'
+          ) ||
+          Boolean(existingUser.email_verified) ||
+          Boolean(false),
         updated_at: new Date().toISOString(),
       }
     );
@@ -227,7 +221,7 @@ async function handleUserDeleted(data) {
       USERS_COLLECTION_ID,
       existingUser.$id,
       {
-        is_active: false,
+        is_active: Boolean(false),
         updated_at: new Date().toISOString(),
       }
     );

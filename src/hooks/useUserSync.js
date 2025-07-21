@@ -9,7 +9,7 @@ export const useUserSync = () => {
   const [appwriteUser, setAppwriteUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState('customer');
   const router = useRouter();
 
   // Define syncUserWithAppwrite using useCallback so it's memoized
@@ -46,7 +46,6 @@ export const useUserSync = () => {
                 profileImageUrl: clerkUser.imageUrl || null,
                 phoneNumber: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
                 role: 'customer', // Default role
-                is_Admin: false, // Default to non-admin
               },
             }),
           });
@@ -89,7 +88,6 @@ export const useUserSync = () => {
               profileImageUrl: clerkUser.imageUrl || null,
               phoneNumber: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
               role: 'customer', // Default role
-              is_Admin: false, // Default to non-admin
             };
 
             existingUser = await UserService.createUser(userData);
@@ -139,14 +137,14 @@ export const useUserSync = () => {
       }
 
       if (existingUser) {
-        // Set admin status based on the is_Admin field in Appwrite
-        const isUserAdmin = existingUser.is_Admin === true;
-        setIsAdmin(isUserAdmin);
+        // Set user role based on the role field in Appwrite
+        const currentUserRole = existingUser.role || 'customer';
+        setUserRole(currentUserRole);
         setAppwriteUser(existingUser);
       } else {
         console.warn('No user data could be retrieved or created');
         setAppwriteUser(null);
-        setIsAdmin(false);
+        setUserRole('customer');
       }
 
       // We'll handle redirects in the component that uses this hook
@@ -164,7 +162,7 @@ export const useUserSync = () => {
       syncUserWithAppwrite();
     } else if (isClerkLoaded && !clerkUser) {
       setAppwriteUser(null);
-      setIsAdmin(false);
+      setUserRole('customer');
       setIsLoading(false);
     }
   }, [clerkUser, isClerkLoaded, syncUserWithAppwrite]);
@@ -179,7 +177,7 @@ export const useUserSync = () => {
         updateData
       );
       setAppwriteUser(updatedUser);
-      setIsAdmin(updatedUser.is_Admin === true);
+      setUserRole(updatedUser.role || 'customer');
       return updatedUser;
     } catch (err) {
       console.error('Error updating Appwrite user:', err);
@@ -197,7 +195,8 @@ export const useUserSync = () => {
   return {
     clerkUser,
     appwriteUser,
-    isAdmin,
+    userRole,
+    isAdmin: userRole === 'admin', // Computed property for backward compatibility
     isLoading,
     error,
     updateAppwriteUser,

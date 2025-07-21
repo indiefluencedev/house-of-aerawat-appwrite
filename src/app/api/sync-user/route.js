@@ -67,25 +67,16 @@ export async function POST(request) {
 
       const newUserData = {
         clerk_id: userData.clerkId,
-        email: userData.email || '',
+        email: userData.email,
         first_name: userData.firstName || '',
         last_name: userData.lastName || '',
         profile_image: userData.profileImageUrl || '',
         phone_number: userData.phoneNumber || '',
         role: userData.role || 'customer',
-        is_Admin: userData.is_Admin || false,
-        is_active: true,
-        email_verified: userData.emailVerified || false,
+        is_active: Boolean(true),
+        email_verified: Boolean(userData.emailVerified || false),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        preferences: {
-          newsletter: false,
-          smsUpdates: false,
-          emailUpdates: true,
-        },
-        addresses: [],
-        wishlist: [],
-        cart: [],
       };
 
       console.log(
@@ -120,8 +111,8 @@ export async function POST(request) {
         phone_number: userData.phoneNumber || existingUser.phone_number,
         email_verified:
           userData.emailVerified !== undefined
-            ? userData.emailVerified
-            : existingUser.email_verified,
+            ? Boolean(userData.emailVerified)
+            : Boolean(existingUser.email_verified),
         updated_at: new Date().toISOString(),
       };
 
