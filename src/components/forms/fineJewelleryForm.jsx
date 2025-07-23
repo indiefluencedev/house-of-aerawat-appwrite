@@ -1,49 +1,47 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Upload, Trash2 } from 'lucide-react';
+import { X, Upload, Trash2, Plus, Minus } from 'lucide-react';
 
-export default function AddProductForm({
+export default function FineJewelleryForm({
   isOpen,
   onClose,
   onSubmit,
-  initialData = {
-    productName: '',
-    description: '',
-    price: '',
-    category: '',
-    images: [],
-  },
+  initialData = null,
   formMode = 'add',
   isLoading = false,
 }) {
-  const [productData, setProductData] = useState(initialData);
+  const defaultData = {
+    name: '',
+    productType: '',
+    description: '',
+    karat: '',
+    additionalInformation: [{ key: '', value: '' }],
+    hasPricing: false,
+    price: '',
+    images: [],
+  };
+
+  const [productData, setProductData] = useState(initialData || defaultData);
   const [dragActive, setDragActive] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
 
-  const categories = [
-    'Crystal',
-    'Fine Jewellery',
-    'Kalpatt',
-    'Wooden Beads',
-    'Treasure Gifts',
-  ];
+  const productTypes = ['Earring', 'Chain', 'Rings/Bands'];
 
   // Update form when initialData changes (for editing)
   useEffect(() => {
-    setProductData(initialData);
+    const dataToSet = initialData || defaultData;
+    setProductData(dataToSet);
+
     // If editing and has existing images, set them up for preview
-    if (initialData.images && initialData.images.length > 0) {
-      setPreviewUrls(initialData.images);
+    if (dataToSet.images && dataToSet.images.length > 0) {
+      setPreviewUrls(dataToSet.images);
+    } else {
+      setPreviewUrls([]);
     }
-  }, [
-    initialData.productName,
-    initialData.description,
-    initialData.price,
-    initialData.category,
-  ]);
+  }, [initialData]);
 
   // Clean up preview URLs when component unmounts
   useEffect(() => {
@@ -63,6 +61,43 @@ export default function AddProductForm({
       ...productData,
       [e.target.name]: value,
     });
+  };
+
+  const handleAdditionalInfoChange = (index, field, value) => {
+    if (!productData || !productData.additionalInformation) return;
+
+    const updatedInfo = [...productData.additionalInformation];
+    updatedInfo[index][field] = value;
+    setProductData({
+      ...productData,
+      additionalInformation: updatedInfo,
+    });
+  };
+
+  const addAdditionalInfoField = () => {
+    if (!productData) return;
+
+    setProductData({
+      ...productData,
+      additionalInformation: [
+        ...(productData.additionalInformation || []),
+        { key: '', value: '' },
+      ],
+    });
+  };
+
+  const removeAdditionalInfoField = (index) => {
+    if (!productData || !productData.additionalInformation) return;
+
+    if (productData.additionalInformation.length > 1) {
+      const updatedInfo = productData.additionalInformation.filter(
+        (_, i) => i !== index
+      );
+      setProductData({
+        ...productData,
+        additionalInformation: updatedInfo,
+      });
+    }
   };
 
   const handleDrag = (e) => {
@@ -127,31 +162,13 @@ export default function AddProductForm({
     if (imageFiles.length === 0) return [];
 
     setUploadingImages(true);
-    const uploadedUrls = [];
 
     try {
-      // Create FormData for the API
-      const formData = new FormData();
-      imageFiles.forEach((file) => {
-        formData.append('files', file);
-      });
-
-      // Upload via API route
-      const response = await fetch('/api/products/upload-images', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to upload images');
-      }
-
-      return result.urls;
+      // Return the imageFiles array for processing by the parent component
+      return imageFiles;
     } catch (error) {
       console.error('Upload error:', error);
-      alert(`Failed to upload images: ${error.message}`);
+      alert(`Failed to prepare images: ${error.message}`);
       return [];
     } finally {
       setUploadingImages(false);
@@ -159,20 +176,30 @@ export default function AddProductForm({
   };
 
   const validateForm = () => {
-    const { productName, price, category } = productData;
+    if (!productData) {
+      alert('Form data is missing');
+      return false;
+    }
 
-    if (!productName || productName.trim() === '') {
+    const { name, productType, karat, hasPricing, price } = productData;
+
+    if (!name || name.trim() === '') {
       alert('Please enter a product name');
       return false;
     }
 
-    if (!price || isNaN(price) || price <= 0) {
-      alert('Please enter a valid price');
+    if (!productType || productType.trim() === '') {
+      alert('Please select a product type');
       return false;
     }
 
-    if (!category || category.trim() === '') {
-      alert('Please select a category');
+    if (!karat || karat.trim() === '') {
+      alert('Please enter karat information');
+      return false;
+    }
+
+    if (hasPricing && (!price || isNaN(price) || price <= 0)) {
+      alert('Please enter a valid price');
       return false;
     }
 
@@ -183,17 +210,24 @@ export default function AddProductForm({
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Upload images first
-    const uploadedImageUrls = await uploadImages();
+    // Get image files for upload
+    const imagesToUpload = await uploadImages();
 
-    // Combine existing images (for edit mode) with newly uploaded ones
-    const allImages = [...(productData.images || []), ...uploadedImageUrls];
+    // Filter out empty additional information fields
+    const filteredAdditionalInfo = productData.additionalInformation.filter(
+      (info) => info.key.trim() && info.value.trim()
+    );
 
-    onSubmit({
+    // Prepare form data
+    const formData = {
       ...productData,
-      price: parseFloat(productData.price),
-      images: allImages,
-    });
+      price: productData.hasPricing ? parseFloat(productData.price) : null,
+      additionalInformation: filteredAdditionalInfo,
+      images: productData.images || [], // Existing images for edit mode
+    };
+
+    // Call onSubmit with form data and image files
+    onSubmit(formData, imagesToUpload);
   };
 
   const handleCancel = () => {
@@ -204,13 +238,7 @@ export default function AddProductForm({
       }
     });
 
-    setProductData({
-      productName: '',
-      description: '',
-      price: '',
-      category: '',
-      images: [],
-    });
+    setProductData(defaultData);
     setImageFiles([]);
     setPreviewUrls([]);
     onClose();
@@ -220,10 +248,12 @@ export default function AddProductForm({
 
   return (
     <div className='fixed inset-0 bg-gray-500/30 flex justify-center items-center z-50'>
-      <div className='bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto'>
+      <div className='bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto'>
         <div className='flex justify-between items-center mb-4'>
           <h2 className='text-xl font-semibold'>
-            {formMode === 'add' ? 'Add New Product' : 'Edit Product'}
+            {formMode === 'add'
+              ? 'Add New Fine Jewellery'
+              : 'Edit Fine Jewellery'}
           </h2>
           <button
             onClick={onClose}
@@ -233,21 +263,42 @@ export default function AddProductForm({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className='space-y-4'>
-          {/* Product Name */}
+        <form onSubmit={handleSubmit} className='space-y-6'>
+          {/* Name */}
           <div>
             <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Product Name
+              Name
             </label>
             <input
               type='text'
-              name='productName'
-              value={productData.productName}
+              name='name'
+              value={productData?.name || ''}
               onChange={handleInputChange}
               className='w-full p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-              placeholder='Enter product name'
+              placeholder='Enter jewellery name'
               required
             />
+          </div>
+
+          {/* Product Type */}
+          <div>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>
+              Product Type
+            </label>
+            <select
+              name='productType'
+              value={productData.productType}
+              onChange={handleInputChange}
+              className='w-full p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              required
+            >
+              <option value=''>Select product type</option>
+              {productTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Description */}
@@ -265,51 +316,108 @@ export default function AddProductForm({
             />
           </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-            {/* Price */}
-            <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
-                Price
-              </label>
-              <div className='relative'>
-                <span className='absolute left-3 top-2 text-gray-500'>₹</span>
-                <input
-                  type='number'
-                  name='price'
-                  value={productData.price}
-                  onChange={handleInputChange}
-                  className='w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                  placeholder='0.00'
-                  step='0.01'
-                  min='0'
-                  required
-                />
-              </div>
-            </div>
+          {/* Karat */}
+          <div>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>
+              Karat
+            </label>
+            <input
+              type='text'
+              name='karat'
+              value={productData.karat}
+              onChange={handleInputChange}
+              className='w-full p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              placeholder='e.g., 18K, 22K, 24K'
+              required
+            />
+          </div>
 
-            {/* Category */}
-            <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
-                Category
-              </label>
-              <select
-                name='category'
-                value={productData.category}
-                onChange={handleInputChange}
-                className='w-full p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                required
+          {/* Additional Information */}
+          <div>
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
+              Additional Information
+            </label>
+            <div className='space-y-3'>
+              {(productData?.additionalInformation || []).map((info, index) => (
+                <div key={index} className='flex gap-2 items-start'>
+                  <input
+                    type='text'
+                    value={info.key || ''}
+                    onChange={(e) =>
+                      handleAdditionalInfoChange(index, 'key', e.target.value)
+                    }
+                    className='flex-1 p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='e.g., Material, Chain Length'
+                  />
+                  <input
+                    type='text'
+                    value={info.value || ''}
+                    onChange={(e) =>
+                      handleAdditionalInfoChange(index, 'value', e.target.value)
+                    }
+                    className='flex-1 p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='e.g., 18K Gold with Natural Diamonds'
+                  />
+                  {(productData?.additionalInformation?.length || 0) > 1 && (
+                    <button
+                      type='button'
+                      onClick={() => removeAdditionalInfoField(index)}
+                      className='p-2 text-red-500 hover:text-red-700'
+                    >
+                      <Minus size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type='button'
+                onClick={addAdditionalInfoField}
+                className='flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm'
               >
-                <option value=''>Select Category</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+                <Plus size={16} />
+                Add More Information
+              </button>
             </div>
           </div>
 
-          {/* Media Upload */}
+          {/* Pricing Section */}
+          <div className='border border-gray-200 rounded-lg p-4'>
+            <div className='flex items-center space-x-3 mb-3'>
+              <input
+                type='checkbox'
+                name='hasPricing'
+                checked={productData.hasPricing}
+                onChange={handleInputChange}
+                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+              />
+              <label className='text-sm font-medium text-gray-700'>
+                Add pricing for this product
+              </label>
+            </div>
+
+            {productData.hasPricing && (
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Price
+                </label>
+                <div className='relative'>
+                  <span className='absolute left-3 top-2 text-gray-500'>₹</span>
+                  <input
+                    type='number'
+                    name='price'
+                    value={productData.price}
+                    onChange={handleInputChange}
+                    className='w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='0.00'
+                    step='0.01'
+                    min='0'
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Image Upload */}
           <div>
             <label className='block text-sm font-medium text-gray-700 mb-1'>
               Product Images
@@ -395,8 +503,8 @@ export default function AddProductForm({
                 : isLoading
                 ? 'Saving...'
                 : formMode === 'add'
-                ? 'Add product'
-                : 'Update Product'}
+                ? 'Add Fine Jewellery'
+                : 'Update Fine Jewellery'}
             </button>
           </div>
         </form>

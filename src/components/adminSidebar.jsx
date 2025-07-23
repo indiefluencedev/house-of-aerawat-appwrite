@@ -27,24 +27,84 @@ export default function AdminSidebar() {
       ),
     },
     {
-      name: 'Products',
-      path: '/admin/products',
-    },
-    {
-      name: 'Stock',
-      path: '/admin/stock',
-    },
-    {
-      name: 'Combos',
-      path: '/admin/combos',
-    },
-    {
       name: 'Customers',
       path: '/admin/customers',
       icon: (
         <Image
-          src='/assets/adminsvgs/customers.svg'
+          src='/assets/svgs/user.svg'
           alt='customers'
+          width={20}
+          height={20}
+        />
+      ),
+    },
+    {
+      name: 'Fine Jewellery',
+      path: '/admin/fine-jewellery',
+      icon: (
+        <Image
+          src='/assets/svgs/fine-jewellery.svg'
+          alt='fine jewellery'
+          width={20}
+          height={20}
+        />
+      ),
+    },
+    {
+      name: 'Shringaar',
+      path: '/admin/shringaar',
+      icon: (
+        <Image
+          src='/assets/svgs/shringaar.svg'
+          alt='shringaar'
+          width={20}
+          height={20}
+        />
+      ),
+    },
+    {
+      name: 'Kalapatt',
+      path: '/admin/kalapatt',
+      icon: (
+        <Image
+          src='/assets/svgs/kalapatt.svg'
+          alt='kalapatt'
+          width={20}
+          height={20}
+        />
+      ),
+    },
+    {
+      name: 'Crystals',
+      path: '/admin/crystals',
+      icon: (
+        <Image
+          src='/assets/svgs/crystals.svg'
+          alt='crystals'
+          width={20}
+          height={20}
+        />
+      ),
+    },
+    {
+      name: 'Kashth Kala',
+      path: '/admin/kashth-kala',
+      icon: (
+        <Image
+          src='/assets/svgs/kashth-kala.svg'
+          alt='kashth kala'
+          width={20}
+          height={20}
+        />
+      ),
+    },
+    {
+      name: 'Treasured Gifts',
+      path: '/admin/treasured-gifts',
+      icon: (
+        <Image
+          src='/assets/svgs/treasured-gifts.svg'
+          alt='treasured gifts'
           width={20}
           height={20}
         />

@@ -4,12 +4,7 @@ import {
   DATABASE_ID,
   USERS_COLLECTION_ID,
 } from '@/lib/appwrite-client';
-import {
-  serverDatabases,
-  DATABASE_ID as SERVER_DATABASE_ID,
-  USERS_COLLECTION_ID as SERVER_USERS_COLLECTION_ID,
-} from '@/lib/appwrite-server';
-import { ID, Query } from 'node-appwrite';
+import { ID, Query } from 'appwrite';
 
 export class UserService {
   // Create user in Appwrite database
@@ -28,6 +23,7 @@ export class UserService {
           phone_number: userData.phoneNumber || null,
           role: userData.role || 'customer',
           is_active: Boolean(true),
+          email_verified: Boolean(userData.emailVerified || false),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           // Add any other fields you need
@@ -135,6 +131,7 @@ export class UserService {
           phone_number: userData.phoneNumber || null,
           role: userData.role || 'customer',
           is_active: Boolean(true),
+          email_verified: Boolean(userData.emailVerified || false),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }

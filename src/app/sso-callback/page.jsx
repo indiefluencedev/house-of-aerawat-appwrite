@@ -18,7 +18,7 @@ export default function SSOCallback() {
       setRedirecting(true);
       // Redirect to admin dashboard if user is an admin
       if (isAdmin) {
-        router.push('/admin-dashboard');
+        router.push('/admin');
       } else {
         router.push('/my-account');
       }

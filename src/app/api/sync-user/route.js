@@ -50,20 +50,51 @@ export async function POST(request) {
     console.log('📊 Database ID:', DATABASE_ID);
     console.log('📁 Collection ID:', USERS_COLLECTION_ID);
 
-    // Check if user exists in Appwrite
-    const existingUsers = await serverDatabases.listDocuments(
-      DATABASE_ID,
-      USERS_COLLECTION_ID,
-      [Query.equal('clerk_id', userData.clerkId)]
-    );
+    // Check if user exists in Appwrite with retry mechanism for race conditions
+    let existingUser = null;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    console.log('📋 Found existing users:', existingUsers.documents.length);
+    while (retryCount < maxRetries) {
+      const existingUsers = await serverDatabases.listDocuments(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        [Query.equal('clerk_id', userData.clerkId)]
+      );
 
-    let existingUser =
-      existingUsers.documents.length > 0 ? existingUsers.documents[0] : null;
+      console.log('📋 Found existing users:', existingUsers.documents.length);
+
+      if (existingUsers.documents.length > 0) {
+        existingUser = existingUsers.documents[0];
+        break;
+      }
+
+      // Small delay to handle race conditions
+      if (retryCount < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        retryCount++;
+        console.log(
+          `🔄 Retry ${retryCount}/${maxRetries} - checking for existing user...`
+        );
+      } else {
+        break;
+      }
+    }
 
     if (!existingUser) {
       console.log('➕ Creating new user in Appwrite...');
+
+      // Detect if user signed up via Google OAuth
+      const isGoogleUser =
+        userData.email &&
+        (userData.profileImageUrl?.includes('googleusercontent.com') ||
+          userData.emailVerified === true); // Google users typically have verified emails from Clerk
+
+      console.log('🔍 Detecting sign-up method:', {
+        isGoogleUser,
+        profileImageUrl: userData.profileImageUrl,
+        emailVerified: userData.emailVerified,
+      });
 
       const newUserData = {
         clerk_id: userData.clerkId,
@@ -74,7 +105,10 @@ export async function POST(request) {
         phone_number: userData.phoneNumber || '',
         role: userData.role || 'customer',
         is_active: Boolean(true),
-        email_verified: Boolean(userData.emailVerified || false),
+        // Set email_verified to true for Google users, otherwise use Clerk's verification status
+        email_verified: Boolean(
+          isGoogleUser || userData.emailVerified || false
+        ),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -83,6 +117,26 @@ export async function POST(request) {
         '📝 New user data to create:',
         JSON.stringify(newUserData, null, 2)
       );
+
+      // Double-check for race condition before creating
+      const finalCheck = await serverDatabases.listDocuments(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        [Query.equal('clerk_id', userData.clerkId)]
+      );
+
+      if (finalCheck.documents.length > 0) {
+        console.log(
+          '⚠️ User was created by another process, using existing user'
+        );
+        existingUser = finalCheck.documents[0];
+
+        return NextResponse.json({
+          success: true,
+          user: existingUser,
+          action: 'found_existing',
+        });
+      }
 
       // Create new user in Appwrite
       const newUser = await serverDatabases.createDocument(

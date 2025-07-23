@@ -1,6 +1,5 @@
 // src/components/navigation/navbar.jsx
 'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -16,24 +15,24 @@ const Navbar = () => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Categories data - matches the structure from your category page
-  const categories = [
+  // products data - now linking to individual product pages
+  const products = [
     { name: 'Fine Jewellery', slug: 'fine-jewellery' },
     { name: 'Shringaar', slug: 'shringaar' },
     { name: 'Kalapatt', slug: 'kalapatt' },
     { name: 'Crystals', slug: 'crystals' },
-    { name: 'Wooden Beads', slug: 'wooden-beads' },
+    { name: 'Kashth Kala', slug: 'kashth-kala' },
     { name: 'Treasured Gifts', slug: 'treasured-gifts' },
   ];
 
-  // Handle category click
-  const handleCategoryClick = (categorySlug) => {
-    router.push(`/category/${categorySlug}`);
+  // Handle products click - now goes to product pages
+  const handleproductsClick = (productSlug) => {
+    router.push(`/products/${productSlug}`);
   };
 
-  // Check if category is active based on current pathname
-  const isCategoryActive = (categorySlug) => {
-    return pathname === `/category/${categorySlug}`;
+  // Check if products is active based on current pathname
+  const isproductsActive = (productSlug) => {
+    return pathname === `/products/${productSlug}`;
   };
 
   const handleLogout = async () => {
@@ -171,6 +170,7 @@ const Navbar = () => {
               width={290}
               height={75}
               className=' md:w-[290px]'
+              style={{ width: 'auto', height: 'auto' }}
               priority
             />
           </Link>
@@ -184,6 +184,7 @@ const Navbar = () => {
             width={28}
             height={28}
             className='search hidden md:block'
+            style={{ width: 'auto', height: 'auto' }}
           />
           <input
             type='text'
@@ -217,28 +218,28 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Category Navigation */}
+      {/* products Navigation */}
       <div className='flex flex-wrap justify-center space-x-4 py-6 text-xs md:text-[14px] new-class2 gap-26 text-black font-medium tracking-wide'>
-        {categories.map((category) => (
+        {products.map((products) => (
           <button
-            key={category.slug}
-            onClick={() => handleCategoryClick(category.slug)}
+            key={products.slug}
+            onClick={() => handleproductsClick(products.slug)}
             className={`
               relative cursor-pointer focus:outline-none transition-all duration-300 ease-in-out
               ${
-                isCategoryActive(category.slug)
+                isproductsActive(products.slug)
                   ? 'text-black'
                   : 'text-black hover:text-gray-700'
               }
             `}
           >
-            {category.name}
+            {products.name}
             {/* Animated underline */}
             <span
               className={`
                 absolute bottom-0 left-0 h-[2px] bg-black transition-all duration-300 ease-in-out
                 ${
-                  isCategoryActive(category.slug)
+                  isproductsActive(products.slug)
                     ? 'w-full'
                     : 'w-0 group-hover:w-full'
                 }

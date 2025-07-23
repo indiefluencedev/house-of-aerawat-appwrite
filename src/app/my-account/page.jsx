@@ -20,7 +20,7 @@ export default function Dashboard() {
 
       // If user is admin, redirect to admin dashboard
       if (isSignedIn && isAdmin) {
-        router.push('/admin-dashboard');
+        router.push('/admin');
       }
     }
   }, [isLoaded, isUserSyncLoading, isSignedIn, isAdmin, router]);

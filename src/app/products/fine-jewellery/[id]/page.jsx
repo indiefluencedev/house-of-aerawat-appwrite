@@ -3,13 +3,25 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getProductById } from '@/data/fine-jewellery';
 
-function ProductDetailPage({ product }) {
+export default function FineJewelleryDetailPage({ params }) {
   const [activeImage, setActiveImage] = useState(0);
   const [openDropdowns, setOpenDropdowns] = useState({});
   const [dropdownHeights, setDropdownHeights] = useState({});
   const [quantity, setQuantity] = useState(1);
+  const [product, setProduct] = useState(null);
   const router = useRouter();
+
+  // Get product from params
+  useEffect(() => {
+    const getProduct = async () => {
+      const { id } = await params;
+      const productData = getProductById(id);
+      setProduct(productData);
+    };
+    getProduct();
+  }, [params]);
 
   // Handle add to cart functionality
   const handleAddToCart = () => {
@@ -23,27 +35,28 @@ function ProductDetailPage({ product }) {
     console.log('Add to wishlist:', product.id);
   };
 
-  // Get product images
-  const productImages =
-    product.images && product.images.length > 0
-      ? product.images
-      : ['/assets/products/cardimage.png'];
-
-  const shippingRef = useRef(null);
-  const returnRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const additionalInfoRef = useRef(null);
+  const shippingReturnRef = useRef(null);
 
   // Calculate dropdown heights when they open
   useEffect(() => {
-    if (openDropdowns.shipping && shippingRef.current) {
+    if (openDropdowns.description && descriptionRef.current) {
       setDropdownHeights((prev) => ({
         ...prev,
-        shipping: shippingRef.current.scrollHeight,
+        description: descriptionRef.current.scrollHeight,
       }));
     }
-    if (openDropdowns.return && returnRef.current) {
+    if (openDropdowns.additionalInfo && additionalInfoRef.current) {
       setDropdownHeights((prev) => ({
         ...prev,
-        return: returnRef.current.scrollHeight,
+        additionalInfo: additionalInfoRef.current.scrollHeight,
+      }));
+    }
+    if (openDropdowns.shippingReturn && shippingReturnRef.current) {
+      setDropdownHeights((prev) => ({
+        ...prev,
+        shippingReturn: shippingReturnRef.current.scrollHeight,
       }));
     }
   }, [openDropdowns]);
@@ -59,10 +72,10 @@ function ProductDetailPage({ product }) {
             The requested product could not be found.
           </p>
           <Link
-            href='/products'
+            href='/products/fine-jewellery'
             className='bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700'
           >
-            Back to Products
+            Back to Fine Jewellery
           </Link>
         </div>
       </div>
@@ -75,6 +88,12 @@ function ProductDetailPage({ product }) {
       [dropdown]: !prev[dropdown],
     }));
   };
+
+  // Get product images
+  const productImages =
+    product.images && product.images.length > 0
+      ? product.images
+      : ['/assets/products/cardimage.png'];
 
   return (
     <div className='min-h-screen'>
@@ -227,12 +246,6 @@ function ProductDetailPage({ product }) {
                   </div>
                 </div>
 
-                <div className='mb-6'>
-                  <p className='text-gray-700'>
-                    {product.description || 'No description available.'}
-                  </p>
-                </div>
-
                 {/* Full Width Stacked Buttons */}
                 <div className='space-y-3 mb-8'>
                   <button
@@ -254,96 +267,136 @@ function ProductDetailPage({ product }) {
                       {product.price > 0 ? 'Add to Cart' : 'Inquire Now'}
                     </span>
                     <img
-                      src='/assets/products/Frame.svg'
+                      src='/assets/products/cart.svg'
                       alt='cart'
                       className='w-5 h-5'
                     />
                   </button>
                 </div>
 
-                {/* Buying Options */}
+                {/* Product Information Toggles */}
                 <div className='space-y-4'>
+                  {/* Description Toggle */}
                   <div className='border-b pb-2'>
                     <div
                       className='flex justify-between items-center cursor-pointer py-2 hover:bg-gray-50 transition-colors duration-200 rounded px-2'
-                      onClick={() => toggleDropdown('shipping')}
+                      onClick={() => toggleDropdown('description')}
                     >
-                      <h3 className='font-medium'>Shipping & Return Policy</h3>
-                      <span
-                        className={`text-xl transition-transform duration-300 ease-in-out ${
-                          openDropdowns.shipping ? 'rotate-180' : 'rotate-0'
-                        }`}
-                      >
-                        {openDropdowns.shipping ? '−' : '+'}
-                      </span>
+                      <h3 className='font-medium'>Description</h3>
+                      <img
+                        src={
+                          openDropdowns.description
+                            ? '/assets/svgs/drop-arrow.svg'
+                            : '/assets/svgs/plus.svg'
+                        }
+                        alt={openDropdowns.description ? 'Collapse' : 'Expand'}
+                        className='w-5 h-5 transition-transform duration-300 ease-in-out'
+                      />
                     </div>
                     <div
                       className='overflow-hidden transition-all duration-300 ease-in-out'
                       style={{
-                        height: openDropdowns.shipping
-                          ? `${dropdownHeights.shipping || 0}px`
+                        height: openDropdowns.description
+                          ? `${dropdownHeights.description || 0}px`
                           : '0px',
-                        opacity: openDropdowns.shipping ? 1 : 0,
+                        opacity: openDropdowns.description ? 1 : 0,
                       }}
                     >
-                      <ul
-                        ref={shippingRef}
-                        className='mt-2 pl-5 list-disc space-y-1 pb-2'
+                      <div
+                        ref={descriptionRef}
+                        className='mt-2 pb-2 text-sm text-gray-600'
                       >
-                        {(
-                          product.shippingPolicy || [
-                            'Free shipping on orders over ₹500',
-                            'Delivery within 3-5 business days',
-                            'International shipping available',
-                          ]
-                        ).map((item, index) => (
-                          <li key={index} className='text-sm text-gray-600'>
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
+                        {product.description || 'No description available.'}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Additional Information Toggle */}
                   <div className='border-b pb-2'>
                     <div
                       className='flex justify-between items-center cursor-pointer py-2 hover:bg-gray-50 transition-colors duration-200 rounded px-2'
-                      onClick={() => toggleDropdown('return')}
+                      onClick={() => toggleDropdown('additionalInfo')}
                     >
-                      <h3 className='font-medium'>Return Policy</h3>
-                      <span
-                        className={`text-xl transition-transform duration-300 ease-in-out ${
-                          openDropdowns.return ? 'rotate-180' : 'rotate-0'
-                        }`}
-                      >
-                        {openDropdowns.return ? '−' : '+'}
-                      </span>
+                      <h3 className='font-medium'>Additional Information</h3>
+                      <img
+                        src={
+                          openDropdowns.additionalInfo
+                            ? '/assets/svgs/drop-arrow.svg'
+                            : '/assets/svgs/plus.svg'
+                        }
+                        alt={
+                          openDropdowns.additionalInfo ? 'Collapse' : 'Expand'
+                        }
+                        className='w-5 h-5 transition-transform duration-300 ease-in-out'
+                      />
                     </div>
                     <div
                       className='overflow-hidden transition-all duration-300 ease-in-out'
                       style={{
-                        height: openDropdowns.return
-                          ? `${dropdownHeights.return || 0}px`
+                        height: openDropdowns.additionalInfo
+                          ? `${dropdownHeights.additionalInfo || 0}px`
                           : '0px',
-                        opacity: openDropdowns.return ? 1 : 0,
+                        opacity: openDropdowns.additionalInfo ? 1 : 0,
                       }}
                     >
-                      <ul
-                        ref={returnRef}
-                        className='mt-2 pl-5 list-disc space-y-1 pb-2'
-                      >
-                        {(
-                          product.returnPolicy || [
-                            '30-day return policy',
-                            'Items must be unused with tags',
-                            'Customer pays return shipping',
-                          ]
-                        ).map((item, index) => (
-                          <li key={index} className='text-sm text-gray-600'>
-                            {item}
+                      <div ref={additionalInfoRef} className='mt-2 pb-2'>
+                        <ul className='ml-5 pl-5 list-disc space-y-1'>
+                          {product.additionalInfo.map((item, index) => (
+                            <li key={index} className='text-sm text-gray-600'>
+                              <span className='font-medium mr-2'>
+                                {item.split(':')[0]}:
+                              </span>
+                              <span>{item.split(':')[1]}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Shipping & Return Policy Toggle */}
+                  <div className='border-b pb-2'>
+                    <div
+                      className='flex justify-between items-center cursor-pointer py-2 hover:bg-gray-50 transition-colors duration-200 rounded px-2'
+                      onClick={() => toggleDropdown('shippingReturn')}
+                    >
+                      <h3 className='font-medium'>Shipping & Return Policy</h3>
+                      <img
+                        src={
+                          openDropdowns.shippingReturn
+                            ? '/assets/svgs/drop-arrow.svg'
+                            : '/assets/svgs/plus.svg'
+                        }
+                        alt={
+                          openDropdowns.shippingReturn ? 'Collapse' : 'Expand'
+                        }
+                        className='w-5 h-5 transition-transform duration-300 ease-in-out'
+                      />
+                    </div>
+                    <div
+                      className='overflow-hidden transition-all duration-300 ease-in-out'
+                      style={{
+                        height: openDropdowns.shippingReturn
+                          ? `${dropdownHeights.shippingReturn || 0}px`
+                          : '0px',
+                        opacity: openDropdowns.shippingReturn ? 1 : 0,
+                      }}
+                    >
+                      <div ref={shippingReturnRef} className='mt-2 pb-2'>
+                        <ul className='ml-5 pl-5 list-disc space-y-1'>
+                          <li className='text-sm text-gray-600'>
+                            Free shipping in India. For more information, please
+                            refer to our shipping policy.
                           </li>
-                        ))}
-                      </ul>
+                          <li className='text-sm text-gray-600'>
+                            We accept return within 7 days of the delivery date.
+                            Return items must be unworn and without signs of
+                            damage and must include all of the extras they were
+                            sent with. Please check our return policy for more
+                            information.
+                          </li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -355,5 +408,3 @@ function ProductDetailPage({ product }) {
     </div>
   );
 }
-
-export default ProductDetailPage;
